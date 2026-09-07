@@ -115,42 +115,50 @@ def test_malformed_request():
     assert response.json()["code"] == "INVALID_REQUEST"
 
 
-def test_startup_warms_the_face_models(monkeypatch):
-    """The startup hook loads the InsightFace pack before the first request.
+def test_startup_does_not_load_face_models(monkeypatch):
+    """Render gives the service 512 Mi: loading the InsightFace pack during
+    application startup caused an out-of-memory crash.
 
-    The warmed analyzer is the same instance the investigation route already
-    holds, so detection and embedding behaviour are unchanged: only the lazy
-    model load moves out of the request path.
+    Starting the app must perform zero model loads. Every path that could
+    load the pack is intercepted at the class level, so a reintroduced
+    warm-up hook - however it captures the identifier - fails this test.
     """
     import app.main as main_module
+    from app.services.face_insightface import InsightFaceIdentifier
 
-    calls: list[str] = []
+    loads: list[str] = []
 
-    class WarmDouble:
-        def warm_up(self):
-            calls.append("warm")
-            return self
+    def warm_up_spy(self):
+        loads.append("warm_up")
+        return self
 
-    monkeypatch.setattr(main_module, "investigation_face_identifier", WarmDouble())
+    def ensure_analyzer_spy(self):
+        loads.append("_ensure_analyzer")
+        return object()  # never used: startup must not get this far
+
+    monkeypatch.setattr(InsightFaceIdentifier, "warm_up", warm_up_spy)
+    monkeypatch.setattr(
+        InsightFaceIdentifier, "_ensure_analyzer", ensure_analyzer_spy
+    )
 
     with TestClient(main_module.app):
         pass
 
-    assert calls == ["warm"]
+    assert loads == []
 
 
-def test_startup_survives_a_failed_warmup(monkeypatch, caplog):
-    """A warm-up failure is logged and must never prevent the app serving."""
-    import app.main as main_module
+def test_face_identifier_is_constructed_lazy():
+    """The production wiring must stay lazy: building the identifier loads no
+    models, so a fresh deployment only pays the model-load cost on the first
+    investigation request (which the 512 Mi plan can absorb)."""
+    from app.config import load_settings
+    from app.services.face_insightface import (
+        InsightFaceIdentifier,
+        build_face_identifier,
+    )
 
-    class Boom:
-        def warm_up(self):
-            raise RuntimeError("model pack unavailable")
+    identifier = build_face_identifier(load_settings(use_dotenv=False))
 
-    monkeypatch.setattr(main_module, "investigation_face_identifier", Boom())
-
-    with TestClient(main_module.app) as warm_client:
-        response = warm_client.get("/api/health")
-
-    assert response.status_code == 200
-    assert "warm-up skipped" in caplog.text
+    assert isinstance(identifier, InsightFaceIdentifier)
+    assert identifier._analyzer is None, "pack must not load at construction"
+    assert identifier._cache is None

@@ -386,7 +386,6 @@ from pydantic import BaseModel
 import logging
 
 from .api.routes.health import router as health_router
-from .api.routes.investigation import face_identifier as investigation_face_identifier
 from .api.routes.investigation import router as investigation_router
 from .core.config import get_settings
 from .core.logging import configure_logging
@@ -421,22 +420,6 @@ app.add_middleware(
 )
 app.include_router(health_router, prefix="/api")
 app.include_router(investigation_router, prefix="/api")
-
-
-@app.on_event("startup")
-async def warm_face_models() -> None:
-    """Load the local InsightFace pack at startup, not on the first request.
-
-    Reuses the identifier the investigation route already holds, so detection
-    and embedding behaviour are unchanged. A failed warm-up must never prevent
-    serving: it is logged and the identifier keeps its lazy load fallback.
-    """
-    try:
-        investigation_face_identifier.warm_up()
-    except Exception as exc:  # noqa: BLE001 - startup must stay alive
-        logging.getLogger("facetrace.startup").warning(
-            "face model warm-up skipped (first request will lazy-load): %s", exc
-        )
 
 
 class VerifyRequest(BaseModel):
