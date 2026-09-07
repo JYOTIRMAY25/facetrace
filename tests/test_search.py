@@ -459,6 +459,46 @@ def test_serpapi_upload_then_lens_search_uses_real_image_id(
     assert outcome.results[0].url == GOOGLE_ARTICLE_URL
 
 
+def test_serpapi_upload_caps_results_in_provider_order(
+    encoding: FaceEncoding, tmp_path: Any
+) -> None:
+    """The uploaded-image Lens path honours SEARCH_MAX_RESULTS, not just the
+    URL-driven path: Lens can return dozens of visual_matches, and every
+    candidate after that cap is one more download + InsightFace pass."""
+    image = tmp_path / "face.png"
+    image.write_bytes(b"real-image-bytes")
+
+    def visual_match(position: int) -> dict[str, Any]:
+        return {
+            "position": position,
+            "title": f"Coverage {position}",
+            "link": f"https://news.example.org/articles/{position}",
+            "source": "news.example.org",
+            "thumbnail": f"https://serpapi.example/thumb-{position}.jpg",
+        }
+
+    payload = {
+        "search_metadata": {"status": "Success"},
+        "visual_matches": [visual_match(n) for n in range(1, 8)],
+    }
+    transport = FakeTransport(ok(SERPAPI_UPLOAD_PAYLOAD), ok(payload))
+    service = make_service(
+        transport,
+        search_provider="serpapi-google-lens",
+        search_api_key="test-key-value",
+        search_max_results=3,
+    )
+
+    outcome = service.search_uploaded_image(image, encoding)
+
+    assert outcome.status is SearchStatus.SUCCESS
+    assert outcome.result_count == 3
+    # The first ``search_max_results`` results win, in provider order.
+    assert [r.url for r in outcome.results] == [
+        f"https://news.example.org/articles/{n}" for n in (1, 2, 3)
+    ]
+
+
 def test_serpapi_upload_missing_key_is_controlled(tmp_path: Any) -> None:
     provider = SerpApiLensProvider(settings=Settings(search_provider="serpapi-google-lens"))
     assert provider.missing_configuration() == ("SERPAPI_API_KEY",)

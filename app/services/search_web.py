@@ -715,13 +715,22 @@ class SerpApiLensProvider(_HttpSearchProvider):
             self.last_attempts = attempts + 1
             self._raise_payload_error(payload)
             retrieved_at = _now_iso()
-            return tuple(
-                parsed
-                for index, raw in enumerate(self._iter_items(payload))
-                if isinstance(raw, Mapping)
-                for parsed in (self._parse_item(raw, index=index, retrieved_at=retrieved_at),)
-                if parsed is not None
-            )
+            # Same cap as the generic search() path: the first
+            # ``search_max_results`` valid results, in provider order.
+            max_results = max(1, int(self.settings.search_max_results or 5))
+            results: list[SearchResult] = []
+            seen: set[str] = set()
+            for index, raw in enumerate(self._iter_items(payload)):
+                if len(results) >= max_results:
+                    break
+                if not isinstance(raw, Mapping):
+                    continue
+                parsed = self._parse_item(raw, index=index, retrieved_at=retrieved_at)
+                if parsed is None or parsed.url in seen:
+                    continue
+                seen.add(parsed.url)
+                results.append(parsed)
+            return tuple(results)
         except SearchTransportError:
             raise
         except OSError as exc:

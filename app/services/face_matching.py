@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Sequence
 
 from ..models.pipeline import FaceEncoding, SearchResult
 from .candidate_image_retrieval import (
+    CandidateImage,
     CandidateImageRetrievalError,
     CandidateImageRetriever,
 )
 from .face_insightface import EmbeddingVector, InsightFaceIdentifier
 from .matching import InsightFaceMatcher
+
+#: Candidate image downloads run through a small bounded pool so network
+#: latency does not accumulate serially. Face inference stays sequential on
+#: the request thread: concurrent CPU inference would contend on one core.
+DOWNLOAD_CONCURRENCY = 4
 
 
 @dataclass(frozen=True)
@@ -36,20 +43,37 @@ def match_candidates(
     retriever = retriever or CandidateImageRetriever()
     matcher = InsightFaceMatcher(face_identifier)
     matcher.register_embedding(source_encoding, source_embedding)
+
+    # Download phase: bounded-concurrent, results keyed by candidate index so
+    # the analysis loop below consumes them in the original provider order.
+    downloads: dict[int, CandidateImage | CandidateImageRetrievalError] = {}
+    with ThreadPoolExecutor(max_workers=DOWNLOAD_CONCURRENCY) as pool:
+        futures = {
+            index: pool.submit(retriever.retrieve, candidate.image_url)
+            for index, candidate in enumerate(candidates)
+            if candidate.image_url
+        }
+        for index, future in futures.items():
+            try:
+                downloads[index] = future.result()
+            except CandidateImageRetrievalError as exc:
+                downloads[index] = exc
+
     results: list[CandidateMatchResult] = []
-    for candidate in candidates:
+    for index, candidate in enumerate(candidates):
         if not candidate.image_url:
             results.append(CandidateMatchResult(candidate, None, None, None, "IMAGE_RETRIEVAL_FAILED", "No candidate image URL."))
             continue
-        try:
-            image = retriever.retrieve(candidate.image_url)
-        except CandidateImageRetrievalError as exc:
+        downloaded = downloads.get(index)
+        if isinstance(downloaded, CandidateImageRetrievalError):
             results.append(
                 CandidateMatchResult(
-                    candidate, None, None, None, exc.code, str(exc)
+                    candidate, None, None, None, downloaded.code, str(downloaded)
                 )
             )
             continue
+        image = downloaded
+        assert image is not None  # every indexed candidate has a completed download
         result, embeddings, encodings = face_identifier.analyze_all_with_embeddings(
             image.image_bytes
         )

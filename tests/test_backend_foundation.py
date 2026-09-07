@@ -113,3 +113,44 @@ def test_malformed_request():
     )
     assert response.status_code == 400
     assert response.json()["code"] == "INVALID_REQUEST"
+
+
+def test_startup_warms_the_face_models(monkeypatch):
+    """The startup hook loads the InsightFace pack before the first request.
+
+    The warmed analyzer is the same instance the investigation route already
+    holds, so detection and embedding behaviour are unchanged: only the lazy
+    model load moves out of the request path.
+    """
+    import app.main as main_module
+
+    calls: list[str] = []
+
+    class WarmDouble:
+        def warm_up(self):
+            calls.append("warm")
+            return self
+
+    monkeypatch.setattr(main_module, "investigation_face_identifier", WarmDouble())
+
+    with TestClient(main_module.app):
+        pass
+
+    assert calls == ["warm"]
+
+
+def test_startup_survives_a_failed_warmup(monkeypatch, caplog):
+    """A warm-up failure is logged and must never prevent the app serving."""
+    import app.main as main_module
+
+    class Boom:
+        def warm_up(self):
+            raise RuntimeError("model pack unavailable")
+
+    monkeypatch.setattr(main_module, "investigation_face_identifier", Boom())
+
+    with TestClient(main_module.app) as warm_client:
+        response = warm_client.get("/api/health")
+
+    assert response.status_code == 200
+    assert "warm-up skipped" in caplog.text

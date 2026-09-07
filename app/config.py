@@ -94,7 +94,7 @@ class Settings:
     search_provider: str = "wikimedia-commons"
     search_api_key: str = field(default="", repr=False)
     search_engine_id: str = ""
-    search_max_results: int = 10
+    search_max_results: int = 5
     #: Operator-supplied query terms. The search stage refuses to invent terms,
     #: so a text provider needs these (or ``--terms``) to run.
     search_terms: str = ""
@@ -206,7 +206,7 @@ def load_settings(
         search_provider=_get(env, "SEARCH_PROVIDER", "wikimedia-commons"),
         search_api_key=_get(env, "SERPAPI_API_KEY") or _get(env, "SEARCH_API_KEY"),
         search_engine_id=_get(env, "SEARCH_ENGINE_ID"),
-        search_max_results=_get_int(env, "SEARCH_MAX_RESULTS", 10),
+        search_max_results=_get_int(env, "SEARCH_MAX_RESULTS", 5),
         search_terms=_get(env, "SEARCH_TERMS"),
         search_image_url=_get(env, "SEARCH_IMAGE_URL"),
         search_user_agent=_get(

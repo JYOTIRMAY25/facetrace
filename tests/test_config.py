@@ -29,7 +29,7 @@ def test_loads_with_empty_environment() -> None:
     assert settings.canonicalization_version == "1"
     assert settings.blockchain_network == "local"
     assert settings.face_match_threshold == pytest.approx(0.65)
-    assert settings.search_max_results == 10
+    assert settings.search_max_results == 5
     assert settings.max_retries == 2
     assert settings.data_dir == PROJECT_ROOT / "data"
 
