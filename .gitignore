@@ -1,0 +1,65 @@
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keystore/
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+*.so
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Testing / tooling caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Biometric & discovered content: keep out of the repo ---
+# data/ holds local run artefacts, face crops, encodings and cached search
+# payloads. Only .gitkeep is tracked.
+data/*
+!data/.gitkeep
+
+# --- Blockchain build output (STEP 2) ---
+artifacts/
+cache/
+out/
+broadcast/
+
+# --- Frontend build output ---
+frontend/.next/
+frontend/node_modules/
+
+# --- Local diagnostic output ---
+api_err.txt
+api_out.txt
+pytest_e2e_out.txt
+pytest_err.txt
+pytest_out.txt
+frontend/*_err.txt
+frontend/*_out.txt
+frontend/npm_install_log.txt
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

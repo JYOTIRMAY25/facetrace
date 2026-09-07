@@ -1,0 +1,34 @@
+# FaceTrace — Python dependencies
+#
+# STEP 1 (project setup), STEP 2 (face detection + encoding) and STEP 3
+# (genuine web/social search) dependencies are active. The remaining heavy
+# blockchain dependencies stay commented out on purpose: installing them before
+# the code that uses them exists only adds long, fragile installs. Uncomment
+# each line in the STEP that introduces it and pin the version you resolved.
+
+# --- STEP 1: configuration + tests ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+pydantic-settings>=2.2.1
+python-dotenv>=1.0.0
+pytest>=8.0.0
+
+# --- STEP 2: face detection & encoding (all inference is local) ---
+opencv-python>=4.9.0
+numpy>=1.26.0
+insightface>=0.7.3            # detection + embedding, ONNX models
+onnxruntime>=1.17.0           # InsightFace inference backend (CPU)
+# scikit-image arrives as an insightface dependency and also supplies the
+# public-domain fixture photograph used by the face tests (see
+# tests/conftest.py). No image files are committed to this repository.
+
+# --- STEP 3: genuine web/social search ---
+httpx>=0.27.0                 # single outbound HTTP boundary (app/services/search_http.py)
+# No HTML scraper is needed: every registered provider exposes a documented JSON
+# API, which keeps the search inside each site's published terms.
+
+# --- STEP 7: blockchain ---
+web3>=6.15.0
+eth-account>=0.11.0

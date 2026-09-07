@@ -1,0 +1,5 @@
+# Local run artefacts only — contents are git-ignored.
+#
+# Nothing here is tracked except this file. Do not commit face images, face
+# crops, encodings, or cached search payloads. Use only images you have
+# permission to process.
