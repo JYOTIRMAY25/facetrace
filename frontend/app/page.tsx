@@ -12,6 +12,7 @@ interface PipelineResponse {
 }
 
 const steps = ['UPLOAD', 'DETECT', 'SEARCH', 'MATCH', 'EVIDENCE', 'SHA-256', 'BLOCKCHAIN', 'VERIFIED'];
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || '';
 
 function BackgroundMotion() {
   const points = [[8, 22], [21, 68], [36, 31], [49, 78], [64, 18], [78, 55], [91, 28], [87, 84], [29, 90]];
@@ -69,7 +70,7 @@ export default function Home() {
     if (!file) return; setLoading(true); setAnalysisError(null); setResult(null);
     const formData = new FormData(); formData.append('file', file);
     try {
-      const res = await fetch('/api/investigate', { method: 'POST', body: formData });
+      const res = await fetch(`${API_BASE_URL}/api/investigate`, { method: 'POST', body: formData });
       const data: PipelineResponse = await res.json();
       if (!res.ok) throw new Error(data.error || data.message || `Request failed (${res.status})`);
       setResult(data);
@@ -92,7 +93,7 @@ export default function Home() {
   const reverifyOnChain = async () => {
     if (!result?.match?.post || !result.record) return; setVerifying(true);
     try {
-      const res = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post: result.match.post, record: result.record }) });
+      const res = await fetch(`${API_BASE_URL}/api/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post: result.match.post, record: result.record }) });
       setVerifyResult(await res.json());
     } finally { setVerifying(false); }
   };
